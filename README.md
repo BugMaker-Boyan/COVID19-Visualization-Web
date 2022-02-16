@@ -1,6 +1,6 @@
 # COVID-19 Data Visualization WEB project
 
-##### Members:  Li Yichen 11912433, Li Boyan 11912914
+##### Members:  Li Yichen 11912433, Li Boyan 11912914 
 
 ## Part 1. Overview
 
