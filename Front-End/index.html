@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>COVID-19 疫情数据可视化</title>
+    <link rel="stylesheet" type="text/css" href="bootstrap/css/bootstrap.min.css">
+    <script src="js/jquery-3.6.0.min.js" type="text/javascript"></script>
+    <script src="bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
+    <script src="js/axios.min.js" type="text/javascript"></script>
+    <script src="js/vue.min.js" type="text/javascript"></script>
+    <script src="js/echarts.min.js" type="text/javascript"></script>
+    <script src="js/lodash.min.js" type="text/javascript"></script>
+    <script src="js/world.js" type="text/javascript"></script>
+    <script src="js/tableExport.min.js" type="text/javascript"></script>
+    <script src="js/jquery.base64.js" type="text/javascript"></script>
+</head>
+<body>
+
+    <div id="app">
+        <div class="container">
+            <div class="row">
+                <h1 class="text-center"><b>COVID-19 疫情数据可视化</b></h1>
+                <div class="col-md-3 col-md-offset-8"><h5 class="text-right">当前数据源：{{dataSourceText}}</h5></div>
+                <div class="col-md-1 ">
+                    <div class="dropdown">
+                        <button class="btn btn-warning dropdown-toggle" data-toggle="dropdown">
+                            数据源
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li class="dropdown-header"> -- 本地 --</li>
+                            <li :class="{active: dataSource===1}"><a href="#" @click="changeDataSource(1)">Our World In Data</a></li>
+                            <li :class="{active: dataSource===2}"><a href="#" @click="changeDataSource(2)">WHO Data</a></li>
+                            <li class="divider"></li>
+                            <li class="dropdown-header"> -- 最新 --</li>
+                            <li :class="{active: dataSource===3}"><a href="#" @click="changeDataSource(3)">Our World In Data</a></li>
+                            <li :class="{active: dataSource===4}"><a href="#" @click="changeDataSource(4)">WHO Data</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <ul class="nav nav-pills">
+                    <li :class="{active: page===0}" @click="changePage(0)"><a href="#"><b style="font-size: large">表格数据</b></a></li>
+                    <li :class="{active: page===1}" @click="changePage(1)"><a href="#"><b style="font-size: large">地图可视化</b></a></li>
+                    <li :class="{active: page===2}" @click="changePage(2)"><a href="#"><b style="font-size: large">柱状图</b></a></li>
+                    <li :class="{active: page===3}" @click="changePage(3)"><a href="#"><b style="font-size: large">折线图</b></a></li>
+                    <li :class="{active: page===4}" @click="changePage(4)"><a href="#"><b style="font-size: large">饼图</b></a></li>
+                </ul>
+            </div>
+            <div class="row" v-show="page === 0">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <form action="#" class="form-inline" role="form">
+                            <div class="form-group">
+                                <label for="country" class="control-label">国家：</label>
+                                <input type="text" id="country" class="form-control" placeholder="请输入国家名称(英文)" v-model="searchCountryName">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="control-label">
+                                    &emsp;&emsp;&emsp;&emsp;
+                                    &emsp;&emsp;&emsp;&emsp;
+                                    &emsp;&emsp;&emsp;&emsp;
+                                    &emsp;&emsp;&emsp;&emsp;
+                                    &emsp;&emsp;&emsp;&emsp;
+                                    &emsp;&emsp;&emsp;&emsp;
+                                    &emsp;&emsp;&emsp;&emsp;
+                                    &emsp;&emsp;&emsp;&emsp;
+                                    &emsp;&emsp;&emsp;&emsp;
+                                    &emsp;&emsp;
+                                    数据更新时间：{{latestDataTime}}
+                                    &emsp;</label>
+                            </div>
+                            <div class="form-group">
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" data-toggle="dropdown">Export to <span class="caret"></span></button>
+                                    <ul class="dropdown-menu" role="menu">
+                                        <li><a @click="exportTable('csv');" href="javascript://">CSV</a></li>
+                                        <li><a @click="exportTable('txt');" href="javascript://">TXT</a></li>
+                                        <li><a @click="exportTable('sql');" href="javascript://">SQL</a></li>
+                                        <li><a @click="exportTable('json');" href="javascript://">JSON</a></li>
+                                        <li><a @click="exportTable('xls');" href="javascript://">XLS</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="panel-body">
+                        <table id="table1" class="table table-striped table-hover" v-if="dataSource === 1 || dataSource === 3">
+                            <tr>
+                                <th @click="sortTable('isoCode')">ISO代码&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('continent')">所属大陆&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('location')">国家&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('totalCases')">总确诊&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('newCases')">新增确诊&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('totalDeaths')">总死亡&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('newDeaths')">新增死亡&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                            </tr>
+                            <tr v-for="item in tableDataList">
+                                <td>{{item.isoCode}}</td>
+                                <td>{{item.continent}}</td>
+                                <td>{{item.location}}</td>
+                                <td>{{item.totalCases}}</td>
+                                <td>{{item.newCases}}</td>
+                                <td>{{item.totalDeaths}}</td>
+                                <td>{{item.newDeaths}}</td>
+                            </tr>
+                        </table>
+                        <table id="table2" class="table table-striped table-hover" v-if="dataSource === 2 || dataSource === 4">
+                            <tr>
+                                <th @click="sortTable('countryCode')">国家代码&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('whoregion')">WHO区域&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('country')">国家&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('cumulativeCases')">总确诊&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('newCases')">新增确诊&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('cumulativeDeaths')">总死亡&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                                <th @click="sortTable('newDeaths')">新增死亡&nbsp;<span class="glyphicon glyphicon-sort"></span></th>
+                            </tr>
+                            <tr v-for="item in tableDataList">
+                                <td>{{item.countryCode}}</td>
+                                <td>{{item.whoregion}}</td>
+                                <td>{{item.country}}</td>
+                                <td>{{item.cumulativeCases}}</td>
+                                <td>{{item.newCases}}</td>
+                                <td>{{item.cumulativeDeaths}}</td>
+                                <td>{{item.newDeaths}}</td>
+                            </tr>
+                        </table>
+
+                    </div>
+
+                </div>
+            </div>
+            <div class="row" v-show="page === 1">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="text-center"><b>总确诊-世界地图</b></h4>
+                    </div>
+                    <div class="panel-body">
+                        <div id="worldChart" style="width: 1135px; height: 500px;"></div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="row" v-show="page === 2">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="text-center"><b>总确诊-动态排序柱状图</b></h4>
+                        <form action="#" class="form-inline" role="form">
+                            <div class="form-group">
+                                <label for="graph-2-1-dateInput" class="control-label">日期：</label>
+                                <input type="month" id="graph-2-1-dateInput" class="form-control" v-model="page2Graph1Date">
+                                <button class="btn btn-primary" @click="page2Graph1Render()">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="panel-body">
+                        <div id="graph-2-1" style="width: 1135px; height: 500px;"></div>
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="text-center"><b>总死亡-时序柱状图</b></h4>
+                        <form action="#" class="form-inline" role="form">
+                            <div class="form-group">
+                                <label class="control-label" for="graph-2-2-selectCountry">国家列表：</label>
+                                <input type="text" class="form-control" id="graph-2-2-selectCountry" readonly="readonly" v-model="page2Graph2CountryList">
+                            </div>
+                            <div class="form-group">
+                                <label for="graph-2-2-countryInput" class="control-label">更改国家：</label>
+                                <input type="text" id="graph-2-2-countryInput" class="form-control" placeholder="请输入国家名称(英文)" v-model="page2Graph2Country">
+                                <button class="btn btn-primary" href="###" @click="page2Graph2ModifyCountryList(0)">添加</button>
+                                <button class="btn btn-primary" href="###" @click="page2Graph2ModifyCountryList(1)">删除</button>
+                            </div>
+                            <div class="form-group">
+                                <label for="graph-2-2-dateInput" class="control-label">日期：</label>
+                                <input type="month" id="graph-2-2-dateInput" class="form-control" v-model="page2Graph2Date">
+                                <button class="btn btn-primary" @click="page2Graph2Render()">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="panel-body">
+                        <div id="graph-2-2" style="width: 1135px; height: 500px;"></div>
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="text-center"><b>新增确诊/死亡-水平对比柱状图</b></h4>
+                        <form action="#" class="form-inline" role="form">
+                            <div class="form-group">
+                                <label class="control-label" for="graph-2-3-selectCountry">国家列表：</label>
+                                <input type="text" class="form-control" id="graph-2-3-selectCountry" readonly="readonly" v-model="page2Graph3CountryList">
+                            </div>
+                            <div class="form-group">
+                                <label for="graph-2-3-countryInput" class="control-label">更改国家：</label>
+                                <input type="text" id="graph-2-3-countryInput" class="form-control" placeholder="请输入国家名称(英文)" v-model="page2Graph3Country">
+                                <button class="btn btn-primary" @click="page2Graph3ModifyCountryList(0)">添加</button>
+                                <button class="btn btn-primary" @click="page2Graph3ModifyCountryList(1)">删除</button>
+                                <button class="btn btn-primary" @click="page2Graph3Render()">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="panel-body">
+                        <div id="graph-2-3" style="width: 1135px; height: 500px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="row" v-show="page === 3">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="text-center"><b>总确诊-动态排序折线图</b></h4>
+                        <form action="#" class="form-inline" role="form">
+                            <div class="form-group">
+                                <label class="control-label" for="graph-3-1-selectCountry">国家列表：</label>
+                                <input type="text" class="form-control" id="graph-3-1-selectCountry" readonly="readonly" v-model="page3Graph1CountryList">
+                            </div>
+                            <div class="form-group">
+                                <label for="graph-3-1-countryInput" class="control-label">更改国家：</label>
+                                <input type="text" id="graph-3-1-countryInput" class="form-control" placeholder="请输入国家名称(英文)" v-model="page3Graph1Country">
+                                <button class="btn btn-primary" href="###" @click="page3Graph1ModifyCountryList(0)">添加</button>
+                                <button class="btn btn-primary" href="###" @click="page3Graph1ModifyCountryList(1)">删除</button>
+                            </div>
+                            <div class="form-group">
+                                <label for="graph-3-1-dateInput" class="control-label">日期：</label>
+                                <input type="month" id="graph-3-1-dateInput" class="form-control" v-model="page3Graph1Date">
+                                <button class="btn btn-primary" @click="page3Graph1Render()">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="panel-body">
+                        <div id="graph-3-1" style="width: 1135px; height: 500px;"></div>
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="text-center"><b>总死亡-动态排序折线图</b></h4>
+                        <form action="#" class="form-inline" role="form">
+                            <div class="form-group">
+                                <label class="control-label" for="graph-3-2-selectCountry">国家列表：</label>
+                                <input type="text" class="form-control" id="graph-3-2-selectCountry" readonly="readonly" v-model="page3Graph2CountryList">
+                            </div>
+                            <div class="form-group">
+                                <label for="graph-3-2-countryInput" class="control-label">更改国家：</label>
+                                <input type="text" id="graph-3-2-countryInput" class="form-control" placeholder="请输入国家名称(英文)" v-model="page3Graph2Country">
+                                <button class="btn btn-primary" href="###" @click="page3Graph2ModifyCountryList(0)">添加</button>
+                                <button class="btn btn-primary" href="###" @click="page3Graph2ModifyCountryList(1)">删除</button>
+                            </div>
+                            <div class="form-group">
+                                <label for="graph-3-2-dateInput" class="control-label">日期：</label>
+                                <input type="month" id="graph-3-2-dateInput" class="form-control" v-model="page3Graph2Date">
+                                <button class="btn btn-primary" @click="page3Graph2Render()">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="panel-body">
+                        <div id="graph-3-2" style="width: 1135px; height: 500px;"></div>
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="text-center"><b>新增确诊/死亡-渐变折线图</b></h4>
+                        <form action="#" class="form-inline" role="form">
+                            <div class="form-group">
+                                <label for="graph-3-3-countryInput" class="control-label">国家：</label>
+                                <input type="text" id="graph-3-3-countryInput" class="form-control" placeholder="请输入国家名称(英文)" v-model="page3Graph3Country">
+                                <button class="btn btn-primary" @click="page3Graph3Render()">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="panel-body">
+                        <div id="graph-3-3" style="width: 1135px; height: 500px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="row" v-show="page === 4">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="text-center"><b>总确诊-可滚动饼图</b></h4>
+                        <form action="#" class="form-inline" role="form">
+                            <div class="form-group">
+                                <label class="control-label" for="graph-4-1-selectCountry">国家列表：</label>
+                                <input type="text" class="form-control" id="graph-4-1-selectCountry" readonly="readonly" v-model="page4Graph1CountryList">
+                            </div>
+                            <div class="form-group">
+                                <label for="graph-4-1-countryInput" class="control-label">更改国家：</label>
+                                <input type="text" id="graph-4-1-countryInput" class="form-control" placeholder="请输入国家名称(英文)" v-model="page4Graph1Country">
+                                <button class="btn btn-primary" href="###" @click="page4Graph1ModifyCountryList(0)">添加</button>
+                                <button class="btn btn-primary" href="###" @click="page4Graph1ModifyCountryList(1)">删除</button>
+                                <button class="btn btn-primary" @click="page4Graph1Render()">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="panel-body">
+                        <div id="graph-4-1" style="width: 1135px; height: 500px;"></div>
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="text-center"><b>总死亡-南丁格尔玫瑰图</b></h4>
+                        <form action="#" class="form-inline" role="form">
+                            <div class="form-group">
+                                <label class="control-label" for="graph-4-2-selectCountry">国家列表：</label>
+                                <input type="text" class="form-control" id="graph-4-2-selectCountry" readonly="readonly" v-model="page4Graph2CountryList">
+                            </div>
+                            <div class="form-group">
+                                <label for="graph-4-2-countryInput" class="control-label">更改国家：</label>
+                                <input type="text" id="graph-4-2-countryInput" class="form-control" placeholder="请输入国家名称(英文)" v-model="page4Graph2Country">
+                                <button class="btn btn-primary" href="###" @click="page4Graph2ModifyCountryList(0)">添加</button>
+                                <button class="btn btn-primary" href="###" @click="page4Graph2ModifyCountryList(1)">删除</button>
+                                <button class="btn btn-primary" @click="page4Graph2Render()">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="panel-body">
+                        <div id="graph-4-2" style="width: 1135px; height: 500px;"></div>
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4 class="text-center"><b>新增确诊/死亡-日历饼图</b></h4>
+                        <form action="#" class="form-inline" role="form">
+                            <div class="form-group">
+                                <label for="graph-4-3-countryInput" class="control-label">国家：</label>
+                                <input type="text" id="graph-4-3-countryInput" class="form-control" placeholder="请输入国家名称(英文)" v-model="page4Graph3Country">
+                                <button class="btn btn-primary" @click="page4Graph3Render()">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="panel-body">
+                        <div id="graph-4-3" style="width: 1135px; height: 500px;"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <script>
+        BASE_URL = "http://localhost:8080";
+
+        const app = new Vue({
+            el: "#app",
+            data: {
+                /*
+                dataSource:
+                1 - 本地OWID
+                2 - 本地WHO
+                3 - 最新OWID
+                4 - 最新WHO
+                 */
+                dataSource: 1,
+                page: 0,
+
+                // page-0
+                latestDataTime: "",
+                searchCountryName: "",
+                allDataList: [],
+                tableDataList: [],
+                sortAttr: "",
+                reverseOrder: 0,
+
+                // page-1
+                nameMap: {},
+                mapData: [],
+                mapDataMaxValue: 0,
+
+                //page-2
+                page2Graph1Date: "2020-03",
+                page2Graph2Date: "2020-04",
+                page2Graph2CountryList: ["Australia", "Canada", "China"],
+                page2Graph2Country: '',
+                page2Graph3CountryList: ["France", "Germany", "Russia"],
+                page2Graph3Country: '',
+
+                //page-3
+                page3Graph1Date: "2020-04",
+                page3Graph1CountryList: ["France","Germany","Iran","Argentina","Spain"],
+                page3Graph1Country: '',
+                page3Graph2Date: "2020-04",
+                page3Graph2CountryList: ["Brazil","India","Mexico","Russia","Peru"],
+                page3Graph2Country: '',
+                page3Graph3Country: 'China',
+
+                // page-4
+                page4Graph1CountryList: ["France","Germany","Iran","Argentina","Spain"],
+                page4Graph1Country: '',
+                page4Graph2CountryList: ["France","Germany","Iran","Argentina","Spain"],
+                page4Graph2Country: '',
+                page4Graph3Country: 'Romania',
+
+
+            },
+            watch: {
+                searchCountryName: function (newVal, oldVal) {
+                    this.debouncedSearchCountry();
+                }
+            },
+            computed: {
+              dataSourceText: function () {
+                  if (this.dataSource === 1) return "本地-OWID";
+                  else if (this.dataSource === 2) return "本地-WHO";
+                  else if (this.dataSource === 3) return "在线-OWID";
+                  else return "在线-WHO";
+              }
+            },
+            created: function () {
+                this.debouncedSearchCountry = _.debounce(this.searchCountry, 500);
+                const vm = this;
+                axios.get("world.json").then(function (response) {
+                    vm.nameMap = response.data.namemap;
+                })
+            },
+            methods: {
+                updateCOVIDData: function () {
+                    let url = "";
+                    const vm = this;
+                    if (this.dataSource === 1) {
+                        url = BASE_URL + "/owid/latestLocalData";
+                        axios.get(url).then(function (response) {
+                            let covidData = response.data;
+                            vm.allDataList = covidData;
+                            vm.tableDataList = covidData;
+                        });
+                        url = BASE_URL + "/owid/latestLocalDate";
+                        axios.get(url).then(function (response) {
+                            vm.latestDataTime = response.data;
+                        })
+                    }else if (this.dataSource === 2){
+                        url = BASE_URL + "/who/latestLocalData";
+                        axios.get(url).then(function (response) {
+                            let covidData = response.data;
+                            vm.allDataList = covidData;
+                            vm.tableDataList = covidData;
+                        });
+                        url = BASE_URL + "/who/latestLocalDate";
+                        axios.get(url).then(function (response) {
+                            vm.latestDataTime = response.data;
+                        })
+                    } else if (this.dataSource === 3) {
+                        url = BASE_URL + "/owid/latestOnlineData";
+                        axios.get(url).then(function (response) {
+                            let covidData = response.data;
+                            vm.allDataList = covidData;
+                            vm.tableDataList = covidData;
+                        });
+                        url = BASE_URL + "/owid/latestOnlineDate";
+                        axios.get(url).then(function (response) {
+                            vm.latestDataTime = response.data;
+                        })
+                    } else if (this.dataSource === 4) {
+                        url = BASE_URL + "/who/latestOnlineData";
+                        axios.get(url).then(function (response) {
+                            let covidData = response.data;
+                            vm.allDataList = covidData;
+                            vm.tableDataList = covidData;
+                        });
+                        url = BASE_URL + "/who/latestOnlineDate";
+                        axios.get(url).then(function (response) {
+                            vm.latestDataTime = response.data;
+                        })
+                    }
+                },
+                searchCountry: function () {
+                    if (this.searchCountryName === "") {
+                        this.tableDataList = this.allDataList;
+                    } else {
+                        let url = "";
+                        const vm = this;
+                        if (this.dataSource === 1) {
+                            url = BASE_URL + "/owid/latestLocalDataByLocation/" + this.searchCountryName;
+                        }else if (this.dataSource === 2){
+                            url = BASE_URL + "/who/latestLocalDataByLocation/" + this.searchCountryName;
+                        } else if (this.dataSource === 3) {
+                            url = BASE_URL + "/owid/latestOnlineDataByLocation/" + this.searchCountryName;
+                        } else if (this.dataSource === 4) {
+                            url = BASE_URL + "/who/latestOnlineDataByLocation/" + this.searchCountryName;
+                        }
+                        axios.get(url).then(function (response) {
+                            vm.tableDataList = response.data;
+                        });
+                    }
+                },
+                changeDataSource: function (source) {
+                    this.dataSource = source;
+                    this.updateCOVIDData();
+                    this.changePage(this.page);
+                },
+                sortTable: function (attr) {
+                    if (attr === this.sortAttr) {
+                        if (this.reverseOrder === 0) this.reverseOrder = 1;
+                        else this.reverseOrder = 0;
+                    } else {
+                        this.reverseOrder = 0;
+                    }
+                    this.sortAttr = attr;
+                    const vm = this;
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getOrderedLocalDataList/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getOrderedLocalDataList/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getOrderedOnlineDataList/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getOrderedOnlineDataList/";
+                            break;
+                    }
+                    axios({
+                        method: "POST",
+                        url: url + this.sortAttr + "/" + this.reverseOrder,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        data: JSON.stringify(this.tableDataList),
+                    }).then(function (response) {
+                        vm.tableDataList = response.data;
+                    });
+                },
+                changePage: function (index) {
+                    this.page = index;
+                    if (index === 1) {
+                        this.page1Render();
+                    } else if (index === 2) {
+                        this.page2Render();
+                    } else if (index === 3) {
+                        this.page3Render();
+                    } else if (index === 4) {
+                        this.page4Render();
+                    }
+                },
+                page1Render: function () {
+                    let vm = this;
+                    vm.mapData = [];
+                    vm.mapDataMaxValue = 0;
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getMapLocalData/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getMapLocalData/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getMapOnlineData/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getMapOnlineData/";
+                            break;
+                    }
+                    axios.get(url)
+                        .then(function (response) {
+                            let mapDataObj;
+                            for (mapDataObj of response.data) {
+                                mapDataObj.name = vm.nameMap[mapDataObj.name];
+                                vm.mapData.push(mapDataObj);
+                                if (mapDataObj.value > vm.mapDataMaxValue) {
+                                    vm.mapDataMaxValue = mapDataObj.value;
+                                }
+                            }
+                            let charDiv = document.getElementById("worldChart");
+                            charDiv.removeAttribute('_echarts_instance_');
+                            let chart = echarts.init(charDiv);
+                            window.addEventListener('resize', function () {
+                                chart.resize();
+                            });
+                            chart.setOption({
+                                grid: {
+                                    width:'100%',
+                                    height:'100%',
+                                    left: '0%',
+                                    right: '0%',
+                                    bottom: '0%',
+                                    containLabel: true
+                                },
+                                tooltip: {
+                                    trigger: 'item',
+                                    formatter: function (val) {
+                                        if(val.data == null) return ;
+                                        return val.data.name + ': ' + val.data.value
+                                    }
+                                },
+                                toolbox: {
+                                    show: true,
+                                    feature: {
+                                        saveAsImage: {show: true}
+                                    }
+                                },
+                                visualMap: {
+                                    min: 0,
+                                    max: vm.mapDataMaxValue,
+                                    text:['max','min'],
+                                    realtime: false,
+                                    calculable: true,
+                                    color: ['#0064d0','#c3e0ff'],
+                                },
+                                series: [
+                                    {
+                                        type: 'map',
+                                        name: '世界地图',
+                                        map: 'world',
+                                        roam: true,
+                                        label: {
+                                            show: false
+                                        },
+                                        zoom: 1.2,
+                                        itemStyle: {
+                                            borderWidth: 0.5,
+                                            borderColor: '#000',
+                                            borderType: 'solid'
+                                        },
+                                        emphasis: {
+                                            label: {
+                                                show: true,
+                                                color: '#fff'
+                                            },
+                                            itemStyle: {
+                                                areaColor: '#FF6347'
+                                            }
+                                        },
+                                        nameMap: vm.nameMap,
+                                        data: vm.mapData
+                                    }
+                                ]
+                            })
+                        });
+                },
+                page2Render: function () {
+                    this.page2Graph1Render();
+                    this.page2Graph2Render();
+                    this.page2Graph3Render();
+                },
+                page3Render: function () {
+                    this.page3Graph1Render();
+                    this.page3Graph2Render();
+                    this.page3Graph3Render();
+                },
+                page4Render: function () {
+                    this.page4Graph1Render();
+                    this.page4Graph2Render();
+                    this.page4Graph3Render();
+                },
+
+                page2Graph1Render: function () {
+                    let vm = this;
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getLocalDataForOneMonth/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getLocalDataForOneMonth/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getOnlineDataForOneMonth/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getOnlineDataForOneMonth/";
+                            break;
+                    }
+                    axios.get(url + vm.page2Graph1Date + "-01")
+                        .then(function (response) {
+                            let data = response.data;
+                            const countryColors = {
+                                Australia: '#00008b',
+                                Canada: '#f00',
+                                China: '#ffde00',
+                                Cuba: '#002a8f',
+                                Finland: '#003580',
+                                France: '#ed2939',
+                                Germany: '#000',
+                                Iceland: '#003897',
+                                India: '#f93',
+                                Japan: '#bc002d',
+                                'North Korea': '#024fa2',
+                                'South Korea': '#000',
+                                'New Zealand': '#00247d',
+                                Norway: '#ef2b2d',
+                                Poland: '#dc143c',
+                                Russia: '#d52b1e',
+                                Turkey: '#e30a17',
+                                'United Kingdom': '#00247d',
+                                'United States': '#b22234'
+                            };
+                            const days = [];
+                            for (let i = 0; i < data.length; ++i) {
+                                if (days.length === 0 || days[days.length - 1] !== data[i][5]) {
+                                    days.push(data[i][5]);
+                                }
+                            }
+                            let chart21Div = document.getElementById("graph-2-1");
+                            chart21Div.removeAttribute('_echarts_instance_');
+                            let chart21 = echarts.init(chart21Div);
+                            let option = {
+                                grid: {
+                                    top: 10,
+                                    bottom: 30,
+                                    left: 150,
+                                    right: 80
+                                },
+                                xAxis: {
+                                    max: 'dataMax',
+                                    axisLabel: {
+                                        formatter: function (n) {
+                                            return Math.round(n) + '';
+                                        }
+                                    }
+                                },
+                                dataset: {
+                                    source: data.slice(1).filter(function (d) {
+                                        return d[5] === 1;
+                                    })
+                                },
+                                yAxis: {
+                                    type: 'category',
+                                    inverse: true,
+                                    max: 10,
+                                    axisLabel: {
+                                        show: true,
+                                        fontSize: 14,
+                                        formatter: function (value) {
+                                            return value + '{flag|' + '}';
+                                        },
+                                        rich: {
+                                            flag: {
+                                                fontSize: 25,
+                                                padding: 5
+                                            }
+                                        }
+                                    },
+                                    animationDuration: 300,
+                                    animationDurationUpdate: 300
+                                },
+                                series: [
+                                    {
+                                        realtimeSort: true,
+                                        seriesLayoutBy: 'column',
+                                        type: 'bar',
+                                        itemStyle: {
+                                            color: function (param) {
+                                                return countryColors[param.value[4]] || '#5470c6';
+                                            }
+                                        },
+                                        encode: {
+                                            x: 0,
+                                            y: 4
+                                        },
+                                        label: {
+                                            show: true,
+                                            precision: 1,
+                                            position: 'right',
+                                            valueAnimation: true,
+                                            fontFamily: 'monospace'
+                                        }
+                                    }
+                                ],
+                                toolbox: {
+                                    show: true,
+                                    feature: {
+                                        saveAsImage: {show: true}
+                                    }
+                                },
+                                animationDuration: 0,
+                                animationDurationUpdate: 2000,
+                                animationEasing: 'linear',
+                                animationEasingUpdate: 'linear',
+                                graphic: {
+                                    elements: [
+                                        {
+                                            type: 'text',
+                                            right: 160,
+                                            bottom: 60,
+                                            style: {
+                                                text: 1,
+                                                font: 'bolder 80px monospace',
+                                                fill: 'rgba(100, 100, 100, 0.25)'
+                                            },
+                                            z: 100
+                                        }
+                                    ]
+                                }
+                            };
+                            chart21.setOption(option);
+                            for (let i = 1; i < days.length - 1; ++i) {
+                                (function (i) {
+                                    setTimeout(function () {
+                                        updateDay(days[i + 1]);
+                                    }, (i - 1) * 2000);
+                                })(i);
+                            }
+                            function updateDay(day) {
+                                option.series[0].data = data.slice(1).filter(function (d) {
+                                    return d[5] === day;
+                                });
+                                option.graphic.elements[0].style.text = vm.page2Graph1Date + "-" + day;
+                                chart21.setOption(option);
+                            }
+
+                        })
+                },
+
+                page2Graph2Render: function () {
+                    let vm = this;
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getLocalDataTotalDeathsForOneMonthByLocations/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getLocalDataTotalDeathsForOneMonthByLocations/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getOnlineDataTotalDeathsForOneMonthByLocations/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getOnlineDataTotalDeathsForOneMonthByLocations/";
+                            break;
+                    }
+                    axios({
+                        method: "POST",
+                        url: url + vm.page2Graph2Date + "-01",
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        data: JSON.stringify(vm.page2Graph2CountryList),
+                    }).then(function (response) {
+                        let dataList = response.data;
+                        let dateList = [];
+                        for (let i = 1; i < dataList.length; i++) {
+                            dateList.push(dataList[i][0]);
+                        }
+                        let countryList = [];
+                        for (let i = 1; i < dataList[0].length; i++) {
+                            countryList.push(dataList[0][i]);
+                        }
+                        let option = {
+                            timeline:{
+                                axisType: 'category',
+                                autoPlay: true,
+                                playInterval: 1500,
+                                data: dateList,
+                                label:{
+                                    fontSize: 18
+                                }
+                            },
+                            baseOption:{
+                                dataset:{
+                                    source:dataList
+                                },
+
+                                title: {
+                                    text: '总死亡数',
+                                    left: 'center',
+                                    textStyle:{
+                                        fontSize:24
+                                    }
+                                },
+                                tooltip: {
+                                    trigger: 'axis'
+                                },
+                                toolbox: {
+                                    show: true,
+                                    feature: {
+                                        saveAsImage: {show: true}
+                                    }
+                                },
+                                legend: {
+                                },
+                                grid: {
+                                    left: '10%',
+                                    bottom: '15%',
+                                    containLabel: true
+                                },
+                                xAxis: [
+                                    {
+                                        type:'category',
+                                        data: countryList,
+                                        axisPointer: {
+                                            type: 'shadow'
+                                        },
+
+                                        axisLabel: {
+                                            formatter: function (value) {
+                                                return '{' + value + '| }\n{value|' + value + '}';
+                                            },
+                                            margin: 20,
+                                            rich: {
+                                                value: {
+                                                    lineHeight: 30,
+                                                    fontSize: 18,
+                                                    align: 'center'
+                                                },
+                                            }
+                                        }
+
+                                    },
+                                ],
+                                yAxis:[
+                                    {
+                                        name:'总死亡数',
+                                        type:'value',
+                                        nameTextStyle:{
+                                            fontSize:18
+                                        },
+                                        axisLabel:{
+                                            fontSize:18
+                                        }
+                                    },
+                                ],
+                                series: [
+                                    {
+                                        type: 'bar',
+                                        seriesLayoutBy: 'row',
+                                        encode:{
+                                            x:'year',
+                                            y:'1998'
+                                        }
+                                    },
+                                ]
+                            },
+                            options:[]
+                        };
+                        for (let n = 0; n<dateList.length; n++){
+                            option.options.push({
+                                title:{
+                                    show:true,
+                                    text:dateList[n]+' 总死亡数统计',
+                                    left: 'center',
+                                    textStyle:{
+                                        fontSize:24
+                                    }
+                                },
+                                series:[
+                                    {
+                                        type: 'bar',
+                                        seriesLayoutBy: 'row',
+                                        encode:{
+                                            x:'date',
+                                            y:dateList[n]
+                                        }
+                                    },
+                                ]
+                            });
+                        }
+                        let chartDom = document.getElementById("graph-2-2");
+                        chartDom.removeAttribute('_echarts_instance_');
+                        let chart = echarts.init(chartDom);
+                        chart.setOption(option);
+                    });
+                },
+
+                page2Graph3Render: function () {
+                    let vm = this;
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getLatestNewCasesNewDeathsLocalDataForLocations/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getLatestNewCasesNewDeathsLocalDataForLocations/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getLatestNewCasesNewDeathsOnlineDataForLocations/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getLatestNewCasesNewDeathsOnlineDataForLocations/";
+                            break;
+                    }
+                    axios({
+                        method: "POST",
+                        url: url,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        data: JSON.stringify(vm.page2Graph3CountryList),
+                    }).then(function (response) {
+                       let countryList = [];
+                       let seriesList = [];
+                       let responseData = response.data;
+                       for (let i = 0;i<responseData.length;i++) {
+                           countryList.push(responseData[i][0]);
+                           seriesList.push({
+                               name: responseData[i][0],
+                               type: 'bar',
+                               data: [responseData[i][1], responseData[i][2]],
+                               label: {
+                                   show: true
+                               }
+                           });
+                       }
+                       let chartDom = document.getElementById("graph-2-3");
+                       chartDom.removeAttribute('_echarts_instance_');
+                       let chart = echarts.init(chartDom);
+                       let option = {
+                           title: {
+                               text: '新增确诊/死亡对比图'
+                           },
+                           tooltip: {
+                               trigger: 'axis',
+                               axisPointer: {
+                                   type: 'shadow'
+                               }
+                           },
+                           legend: {
+                               data: countryList,
+                           },
+                           grid: {
+                               left: 100
+                           },
+                           toolbox: {
+                               show: true,
+                               feature: {
+                                   saveAsImage: {show: true}
+                               }
+                           },
+                           xAxis: {
+                               type: 'value',
+                               name: 'Number',
+                               axisLabel: {
+                                   formatter: '{value}'
+                               }
+                           },
+                           yAxis: {
+                               type: 'category',
+                               inverse: true,
+                               data: ['新增确诊', '新增死亡'],
+                               axisLabel: {
+                                   formatter: function (value) {
+                                       return '{' + value + '| }\n{value|' + value + '}';
+                                   },
+                                   margin: 20,
+                                   rich: {
+                                       value: {
+                                           lineHeight: 30,
+                                           align: 'center'
+                                       },
+                                   }
+                               }
+                           },
+                           series: seriesList
+                       };
+                       chart.setOption(option);
+                    });
+                },
+
+                page3Graph1Render: function () {
+                    let vm = this;
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getLocalDataForOneMonth/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getLocalDataForOneMonth/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getOnlineDataForOneMonth/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getOnlineDataForOneMonth/";
+                            break;
+                    }
+                    axios.get(url + vm.page3Graph1Date + "-01")
+                        .then(function (response) {
+                            let data = response.data;
+                            let chartDom = document.getElementById("graph-3-1");
+                            chartDom.removeAttribute('_echarts_instance_');
+                            let chart = echarts.init(chartDom);
+                            let rawData = data;
+                            let countries = vm.page3Graph1CountryList;
+                            const datasetWithFilters = [];
+                            const seriesList = [];
+                            echarts.util.each(countries, function (country) {
+                                let datasetId = 'dataset_' + country;
+                                datasetWithFilters.push({
+                                    id: datasetId,
+                                    fromDatasetId: 'dataset_raw',
+                                    transform: {
+                                        type: 'filter',
+                                        config: {
+                                            and: [
+                                                { dimension: 'day', gte: 1 },
+                                                { dimension: 'location', '=': country }
+                                            ]
+                                        }
+                                    }
+                                });
+                                seriesList.push({
+                                    type: 'line',
+                                    datasetId: datasetId,
+                                    showSymbol: false,
+                                    name: country,
+                                    endLabel: {
+                                        show: true,
+                                        formatter: function (params) {
+                                            return params.value[4] + ': ' + params.value[0];
+                                        }
+                                    },
+                                    labelLayout: {
+                                        moveOverlap: 'shiftY'
+                                    },
+                                    emphasis: {
+                                        focus: 'series'
+                                    },
+                                    encode: {
+                                        x: 'day',
+                                        y: 'totalCases',
+                                        label: ['location', 'totalCases'],
+                                        itemName: 'day',
+                                        tooltip: ['totalCases']
+                                    }
+                                });
+                            });
+                            option = {
+                                animationDuration: 10000,
+                                dataset: [
+                                    {
+                                        id: 'dataset_raw',
+                                        source: rawData
+                                    },
+                                    ...datasetWithFilters
+                                ],
+                                toolbox: {
+                                    show: true,
+                                    feature: {
+                                        saveAsImage: {show: true}
+                                    }
+                                },
+                                title: {
+                                    text: vm.page3Graph1Date + "总确诊数",
+                                    left: 'center'
+                                },
+                                tooltip: {
+                                    order: 'valueDesc',
+                                    trigger: 'axis'
+                                },
+                                xAxis: {
+                                    type: 'category',
+                                    nameLocation: 'middle'
+                                },
+                                yAxis: {
+                                    name: '总确诊数'
+                                },
+                                grid: {
+                                    right: 140
+                                },
+                                series: seriesList
+                            };
+                            chart.setOption(option);
+                        });
+                },
+
+                page3Graph2Render: function () {
+                    let vm = this;
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getLocalDataForOneMonth/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getLocalDataForOneMonth/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getOnlineDataForOneMonth/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getOnlineDataForOneMonth/";
+                            break;
+                    }
+                    axios.get(url + vm.page3Graph2Date + "-01")
+                        .then(function (response) {
+                            let data = response.data;
+                            let chartDom = document.getElementById("graph-3-2");
+                            chartDom.removeAttribute('_echarts_instance_');
+                            let chart = echarts.init(chartDom);
+                            let rawData = data;
+                            let countries = vm.page3Graph2CountryList;
+                            const datasetWithFilters = [];
+                            const seriesList = [];
+                            echarts.util.each(countries, function (country) {
+                                let datasetId = 'dataset_' + country;
+                                datasetWithFilters.push({
+                                    id: datasetId,
+                                    fromDatasetId: 'dataset_raw',
+                                    transform: {
+                                        type: 'filter',
+                                        config: {
+                                            and: [
+                                                { dimension: 'day', gte: 1 },
+                                                { dimension: 'location', '=': country }
+                                            ]
+                                        }
+                                    }
+                                });
+                                seriesList.push({
+                                    type: 'line',
+                                    datasetId: datasetId,
+                                    showSymbol: false,
+                                    name: country,
+                                    endLabel: {
+                                        show: true,
+                                        formatter: function (params) {
+                                            return params.value[4] + ': ' + params.value[2];
+                                        }
+                                    },
+                                    labelLayout: {
+                                        moveOverlap: 'shiftY'
+                                    },
+                                    emphasis: {
+                                        focus: 'series'
+                                    },
+                                    encode: {
+                                        x: 'day',
+                                        y: 'totalDeaths',
+                                        label: ['location', 'totalDeaths'],
+                                        itemName: 'day',
+                                        tooltip: ['totalDeaths']
+                                    }
+                                });
+                            });
+                            option = {
+                                animationDuration: 10000,
+                                dataset: [
+                                    {
+                                        id: 'dataset_raw',
+                                        source: rawData
+                                    },
+                                    ...datasetWithFilters
+                                ],
+                                toolbox: {
+                                    show: true,
+                                    feature: {
+                                        saveAsImage: {show: true}
+                                    }
+                                },
+                                title: {
+                                    text: vm.page3Graph2Date + "总死亡数",
+                                    left: 'center'
+                                },
+                                tooltip: {
+                                    order: 'valueDesc',
+                                    trigger: 'axis'
+                                },
+                                xAxis: {
+                                    type: 'category',
+                                    nameLocation: 'middle'
+                                },
+                                yAxis: {
+                                    name: '总死亡数'
+                                },
+                                grid: {
+                                    right: 140
+                                },
+                                series: seriesList
+                            };
+                            chart.setOption(option);
+                        });
+                },
+
+                page3Graph3Render: function () {
+                    let vm = this;
+                    let date = new Date();
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getLocalDataForOneMonth/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getLocalDataForOneMonth/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getOnlineDataForOneMonth/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getOnlineDataForOneMonth/";
+                            break;
+                    }
+                    axios.get(url + date.getFullYear() + "-" + (date.getMonth()+1) + "-01")
+                        .then(function (response) {
+                            let data = response.data;
+                            let chartDom = document.getElementById("graph-3-3");
+                            chartDom.removeAttribute('_echarts_instance_');
+                            let chart = echarts.init(chartDom);
+                            let dateList = [];
+                            let valueList1 = [];
+                            let valueList2 = [];
+                            for (let i = 1; i < data.length; i++) {
+                                if (data[i][4] === vm.page3Graph3Country) {
+                                    dateList.push(date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + data[i][5]);
+                                    valueList1.push(data[i][1]);
+                                    valueList2.push(data[i][3]);
+                                }
+                            }
+                            let option = {
+                                visualMap: [
+                                    {
+                                        show: false,
+                                        type: 'continuous',
+                                        seriesIndex: 0,
+                                        min: 0,
+                                        max: 400
+                                    },
+                                    {
+                                        show: false,
+                                        type: 'continuous',
+                                        seriesIndex: 1,
+                                        dimension: 0,
+                                        min: 0,
+                                        max: dateList.length - 1
+                                    }
+                                ],
+                                title: [
+                                    {
+                                        left: 'center',
+                                        text: '新增确诊'
+                                    },
+                                    {
+                                        top: '55%',
+                                        left: 'center',
+                                        text: '新增死亡'
+                                    }
+                                ],
+                                toolbox: {
+                                    show: true,
+                                    feature: {
+                                        saveAsImage: {show: true}
+                                    }
+                                },
+                                tooltip: {
+                                    trigger: 'axis'
+                                },
+                                xAxis: [
+                                    {
+                                        data: dateList
+                                    },
+                                    {
+                                        data: dateList,
+                                        gridIndex: 1
+                                    }
+                                ],
+                                yAxis: [
+                                    {},
+                                    {
+                                        gridIndex: 1
+                                    }
+                                ],
+                                grid: [
+                                    {
+                                        bottom: '60%'
+                                    },
+                                    {
+                                        top: '60%'
+                                    }
+                                ],
+                                series: [
+                                    {
+                                        type: 'line',
+                                        showSymbol: false,
+                                        data: valueList1
+                                    },
+                                    {
+                                        type: 'line',
+                                        showSymbol: false,
+                                        data: valueList2,
+                                        xAxisIndex: 1,
+                                        yAxisIndex: 1
+                                    }
+                                ]
+                            };
+
+                            chart.setOption(option);
+                        });
+                },
+
+                page4Graph1Render: function () {
+                    let vm = this;
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getLocalDataPieTotalCasesData/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getLocalDataPieTotalCasesData/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getOnlineDataPieTotalCasesData/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getOnlineDataPieTotalCasesData/";
+                            break;
+                    }
+                    axios({
+                        method: "POST",
+                        url: url,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        data: JSON.stringify(vm.page4Graph1CountryList),
+                    }).then(function (response) {
+                        let data = response.data;
+                        let chartDom = document.getElementById("graph-4-1");
+                        chartDom.removeAttribute('_echarts_instance_');
+                        let chart = echarts.init(chartDom);
+                        let option = {
+                            title: {
+                                text: '总确诊',
+                                left: 'center'
+                            },
+                            tooltip: {
+                                trigger: 'item',
+                                formatter: '{a} <br/>{b} : {c} ({d}%)'
+                            },
+                            toolbox: {
+                                show: true,
+                                feature: {
+                                    saveAsImage: {show: true}
+                                }
+                            },
+                            legend: {
+                                type: 'scroll',
+                                orient: 'vertical',
+                                right: 10,
+                                top: 20,
+                                bottom: 20,
+                                data: data.legendData
+                            },
+                            series: [
+                                {
+                                    name: '国家',
+                                    type: 'pie',
+                                    radius: '55%',
+                                    center: ['40%', '50%'],
+                                    data: data.seriesData,
+                                    emphasis: {
+                                        itemStyle: {
+                                            shadowBlur: 10,
+                                            shadowOffsetX: 0,
+                                            shadowColor: 'rgba(0, 0, 0, 0.5)'
+                                        }
+                                    }
+                                }
+                            ]
+                        };
+                        chart.setOption(option);
+                    });
+
+                },
+
+                page4Graph2Render: function () {
+                    let vm = this;
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getLocalDataPieTotalDeathsData/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getLocalDataPieTotalDeathsData/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getOnlineDataPieTotalDeathsData/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getOnlineDataPieTotalDeathsData/";
+                            break;
+                    }
+                    axios({
+                        method: "POST",
+                        url: url,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        data: JSON.stringify(vm.page4Graph2CountryList),
+                    }).then(function (response) {
+                        let data = response.data;
+                        let chartDom = document.getElementById("graph-4-2");
+                        chartDom.removeAttribute('_echarts_instance_');
+                        let chart = echarts.init(chartDom);
+                        let option = {
+                            legend: {
+                                top: 'bottom'
+                            },
+                            toolbox: {
+                                show: true,
+                                feature: {
+                                    saveAsImage: { show: true }
+                                }
+                            },
+                            tooltip: {
+                                trigger: 'item',
+                                formatter: '{a} <br/>{b} : {c} ({d}%)'
+                            },
+                            series: [
+                                {
+                                    name: '总死亡',
+                                    type: 'pie',
+                                    radius: [50, 250],
+                                    center: ['50%', '50%'],
+                                    roseType: 'area',
+                                    itemStyle: {
+                                        borderRadius: 8
+                                    },
+                                    data: data.seriesData
+                                }
+                            ]
+                        };
+                        chart.setOption(option);
+                    });
+                },
+
+                page4Graph3Render: function () {
+                    let vm = this;
+                    let date = new Date();
+                    let url = '';
+                    switch (this.dataSource) {
+                        case 1:
+                            url = BASE_URL + "/owid/getLocalDataForOneMonth/";
+                            break;
+                        case 2:
+                            url = BASE_URL + "/who/getLocalDataForOneMonth/";
+                            break;
+                        case 3:
+                            url = BASE_URL + "/owid/getOnlineDataForOneMonth/";
+                            break;
+                        case 4:
+                            url = BASE_URL + "/who/getOnlineDataForOneMonth/";
+                            break;
+                    }
+                    axios.get(url + date.getFullYear() + "-" + (date.getMonth()+1) + "-01")
+                        .then(function (response) {
+                            let data = response.data;
+                            let chartDom = document.getElementById("graph-4-3");
+                            chartDom.removeAttribute('_echarts_instance_');
+                            let chart = echarts.init(chartDom);
+                            let scatterData = [];
+                            for (let i = 1; i < data.length; i++) {
+                                if (data[i][4] === vm.page4Graph3Country) {
+                                    scatterData.push([
+                                        date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + data[i][5],
+                                        data[i][1],
+                                        data[i][3]
+                                    ]);
+                                }
+                            }
+                            const cellSize = [80, 80];
+                            const pieRadius = 30;
+                            function getPieSeries(scatterData, chart) {
+                                return scatterData.map(function (item, index) {
+                                    let center = chart.convertToPixel('calendar', item);
+                                    return {
+                                        id: index + 'pie',
+                                        type: 'pie',
+                                        center: center,
+                                        label: {
+                                            formatter: '{c}',
+                                            position: 'inside'
+                                        },
+                                        radius: pieRadius,
+                                        data: [
+                                            { name: '新增确诊', value: item[1] },
+                                            { name: '新增死亡', value: item[2] },
+                                        ]
+                                    };
+                                });
+                            }
+                            function getPieSeriesUpdate(scatterData, chart) {
+                                return scatterData.map(function (item, index) {
+                                    var center = chart.convertToPixel('calendar', item);
+                                    return {
+                                        id: index + 'pie',
+                                        center: center
+                                    };
+                                });
+                            }
+                            option = {
+                                tooltip: {},
+                                legend: {
+                                    data: ['新增确诊', '新增死亡'],
+                                    bottom: 20
+                                },
+                                toolbox: {
+                                    show: true,
+                                    feature: {
+                                        saveAsImage: {show: true}
+                                    }
+                                },
+                                calendar: {
+                                    top: 'middle',
+                                    left: 'center',
+                                    orient: 'vertical',
+                                    cellSize: cellSize,
+                                    yearLabel: {
+                                        show: false,
+                                        fontSize: 30
+                                    },
+                                    dayLabel: {
+                                        margin: 20,
+                                        firstDay: 1,
+                                        nameMap: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                                    },
+                                    monthLabel: {
+                                        show: false
+                                    },
+                                    range: [date.getFullYear() + "-" + (date.getMonth() + 1)]
+                                },
+                                series: [
+                                    {
+                                        id: 'label',
+                                        type: 'scatter',
+                                        coordinateSystem: 'calendar',
+                                        symbolSize: 1,
+                                        label: {
+                                            show: true,
+                                            formatter: function (params) {
+                                                return echarts.format.formatTime('dd', params.value[0]);
+                                            },
+                                            offset: [-cellSize[0] / 2 + 10, -cellSize[1] / 2 + 10],
+                                            fontSize: 14
+                                        },
+                                        data: scatterData
+                                    }
+                                ]
+                            };
+                            let pieInitialized;
+                            setTimeout(function () {
+                                pieInitialized = true;
+                                chart.setOption({
+                                    series: getPieSeries(scatterData, chart)
+                                });
+                            }, 10);
+                            app.onresize = function () {
+                                if (pieInitialized) {
+                                    chart.setOption({
+                                        series: getPieSeriesUpdate(scatterData, chart)
+                                    });
+                                }
+                            };
+                            chart.setOption(option);
+                        });
+                },
+
+                page2Graph2ModifyCountryList: function (flag) {
+                    if (flag === 0) {
+                        this.page2Graph2CountryList.push(this.page2Graph2Country);
+                    } else {
+                        let index = this.page2Graph2CountryList.indexOf(this.page2Graph2Country);
+                        if (index !== -1) {
+                            this.page2Graph2CountryList.splice(index, 1);
+                        }
+                    }
+                },
+
+                page2Graph3ModifyCountryList: function (flag) {
+                    if (flag === 0) {
+                        this.page2Graph3CountryList.push(this.page2Graph3Country);
+                    } else {
+                        let index = this.page2Graph3CountryList.indexOf(this.page2Graph3Country);
+                        if (index !== -1) {
+                            this.page2Graph3CountryList.splice(index, 1);
+                        }
+                    }
+                },
+
+                page3Graph1ModifyCountryList: function (flag) {
+                    if (flag === 0) {
+                        this.page3Graph1CountryList.push(this.page3Graph1Country);
+                    } else {
+                        let index = this.page3Graph1CountryList.indexOf(this.page3Graph1Country);
+                        if (index !== -1) {
+                            this.page3Graph1CountryList.splice(index, 1);
+                        }
+                    }
+                },
+
+                page3Graph2ModifyCountryList: function (flag) {
+                    if (flag === 0) {
+                        this.page3Graph2CountryList.push(this.page3Graph2Country);
+                    } else {
+                        let index = this.page3Graph2CountryList.indexOf(this.page3Graph2Country);
+                        if (index !== -1) {
+                            this.page3Graph2CountryList.splice(index, 1);
+                        }
+                    }
+                },
+
+                page4Graph1ModifyCountryList: function (flag) {
+                    if (flag === 0) {
+                        this.page4Graph1CountryList.push(this.page4Graph1Country);
+                    } else {
+                        let index = this.page4Graph1CountryList.indexOf(this.page4Graph1Country);
+                        if (index !== -1) {
+                            this.page4Graph1CountryList.splice(index, 1);
+                        }
+                    }
+                },
+
+                page4Graph2ModifyCountryList: function (flag) {
+                    if (flag === 0) {
+                        this.page4Graph2CountryList.push(this.page4Graph2Country);
+                    } else {
+                        let index = this.page4Graph2CountryList.indexOf(this.page4Graph2Country);
+                        if (index !== -1) {
+                            this.page4Graph2CountryList.splice(index, 1);
+                        }
+                    }
+                },
+
+                exportTable: function (type) {
+                    if (this.dataSource === 1 || this.dataSource === 3) {
+                        $("#table1").tableExport({
+                            filename:'OWID_Table',
+                            format: type
+                        });
+                    } else {
+                        $("#table2").tableExport({
+                            filename:'WHO_Table',
+                            format: type
+                        });
+                    }
+
+                }
+            }
+        });
+        app.updateCOVIDData();
+    </script>
+</body>
+</html>
